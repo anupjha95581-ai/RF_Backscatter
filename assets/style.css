@@ -1,0 +1,78 @@
+:root{
+  --bg0:#070A12;
+  --bg1:#0B1220;
+  --card: rgba(255,255,255,0.06);
+  --card2: rgba(16, 27, 51, 0.55);
+  --stroke: rgba(255,255,255,0.10);
+  --glow: rgba(0,245,160,0.25);
+  --glow2: rgba(0,160,255,0.18);
+}
+
+.stApp{
+  background: radial-gradient(1200px 800px at 15% 15%, rgba(0,245,160,0.10), transparent 50%),
+              radial-gradient(1200px 800px at 85% 20%, rgba(0,160,255,0.10), transparent 55%),
+              linear-gradient(180deg, var(--bg0), var(--bg1));
+}
+
+.stApp:before{
+  content:"";
+  position: fixed;
+  inset: -40%;
+  background:
+    conic-gradient(from 90deg at 50% 50%,
+      rgba(0,245,160,0.10),
+      rgba(0,160,255,0.08),
+      rgba(180,0,255,0.06),
+      rgba(0,245,160,0.10)
+    );
+  filter: blur(90px);
+  opacity: 0.35;
+  animation: spin-slow 26s linear infinite;
+  z-index: 0;
+  pointer-events: none;
+}
+
+@keyframes spin-slow{
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+[data-testid="stAppViewContainer"] > .main{
+  position: relative;
+  z-index: 1;
+}
+
+div[data-testid="stVerticalBlockBorderWrapper"],
+section[data-testid="stSidebar"] > div{
+  background: linear-gradient(180deg, var(--card), var(--card2));
+  border: 1px solid var(--stroke);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35), 0 0 40px var(--glow);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 18px;
+}
+
+div[data-testid="stVerticalBlockBorderWrapper"]{
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:hover{
+  transform: translateY(-2px);
+  border-color: rgba(0,245,160,0.22);
+  box-shadow: 0 14px 38px rgba(0,0,0,0.42), 0 0 60px var(--glow2);
+}
+
+section[data-testid="stSidebar"]{
+  border-right: 1px solid rgba(255,255,255,0.08);
+}
+
+[data-testid="stMarkdownContainer"],
+[data-testid="stMetric"],
+[data-testid="stPlotlyChart"],
+[data-testid="stPyplotFigure"]{
+  animation: fadeUp .35s ease both;
+}
+
+@keyframes fadeUp{
+  from { opacity:0; transform: translateY(8px); }
+  to { opacity:1; transform: translateY(0px); }
+}
