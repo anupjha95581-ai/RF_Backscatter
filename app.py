@@ -18,8 +18,22 @@ load_css("assets/style.css")
 
 # --- 1. PAGE SETUP ---
 st.set_page_config(page_title="RF Backscatter Demo", layout="wide")
+
+# Stylish animated header wrapper (NO CHANGE to your title/info text)
+st.markdown(
+    """
+    <div class="hero">
+      <div class="hero__scanline"></div>
+      <div class="hero__glow"></div>
+      <div class="hero__content">
+    """,
+    unsafe_allow_html=True,
+)
+
 st.title("📡 Ambient RF Backscatter: Live Sensor Data Demo")
 st.markdown("Simulating a battery-less sensor sending real-world data by reflecting Wi-Fi signals.")
+
+st.markdown("</div></div>", unsafe_allow_html=True)
 
 # --- 2. TEXT TO BINARY CONVERTERS ---
 def text_to_binary(text):
@@ -39,6 +53,10 @@ st.sidebar.header("Simulation Controls")
 noise_level = st.sidebar.slider("Ambient Wi-Fi Noise Level", 0.1, 2.0, 0.5)
 signal_strength = st.sidebar.slider("Backscatter Reflection Strength", 0.05, 0.5, 0.2)
 sensor_data = st.sidebar.text_input("Simulated Sensor Reading", "24C") # Default text is 24C
+
+st.sidebar.divider()
+enable_3d = st.sidebar.toggle("Enable 3D / Interactive View", value=True)
+enable_downloads = st.sidebar.toggle("Enable Downloads", value=True)
 
 # --- 4. MATHEMATICAL SIMULATION ---
 @st.cache_data
@@ -95,6 +113,22 @@ def extract_bits(envelope, fs, t_bit, threshold):
             decoded_bits += "0"
     return decoded_bits
 
+# --- Matplotlib neon styling helper (visual only) ---
+def style_neon_axes(ax, face="#0B1220"):
+    ax.set_facecolor(face)
+    for spine in ax.spines.values():
+        spine.set_color((1, 1, 1, 0.12))
+    ax.tick_params(colors=(1, 1, 1, 0.75))
+    ax.xaxis.label.set_color((1, 1, 1, 0.75))
+    ax.yaxis.label.set_color((1, 1, 1, 0.75))
+    ax.grid(alpha=0.18, linestyle="--")
+
+def glow_line(ax, x, y, color, base_lw=1.8):
+    # fake "glow" by plotting thicker transparent lines under the main line
+    for lw, a in [(10, 0.05), (7, 0.07), (5, 0.10)]:
+        ax.plot(x, y, color=color, linewidth=lw, alpha=a)
+    ax.plot(x, y, color=color, linewidth=base_lw, alpha=0.95)
+
 # --- 6. RUNNING THE PIPELINE ---
 if len(sensor_data) > 8:
     st.warning("Keep the text short (under 8 characters) so the simulation runs fast!")
@@ -109,72 +143,72 @@ else:
     time_axis, raw_rf, fs, t_bit = generate_rf_signal(bits_to_send, noise_level, signal_strength)
     envelope = decode_signal(raw_rf, fs)
 
-    # (Styling-only) quick metrics row
+    # 3. Visualization
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Sample Rate (Hz)", f"{fs}")
     m2.metric("Bit Duration (s)", f"{t_bit:.3f}")
     m3.metric("Noise Level", f"{noise_level:.2f}")
     m4.metric("Reflection Strength", f"{signal_strength:.2f}")
 
-    # 3. Visualization
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("1. Raw Antenna Feed (Noisy Wi-Fi)")
         fig1, ax1 = plt.subplots(figsize=(8, 3))
-        ax1.plot(time_axis, raw_rf, color='grey', alpha=0.7)
+        style_neon_axes(ax1)
+        glow_line(ax1, time_axis, raw_rf, color="#C9D1D9", base_lw=1.4)
         ax1.set_xlabel("Time (s)")
-        ax1.grid(alpha=0.2)
         st.pyplot(fig1, use_container_width=True)
 
     with col2:
         st.subheader("2. DSP Output (Envelope Detection)")
         fig2, ax2 = plt.subplots(figsize=(8, 3))
-        ax2.plot(time_axis, envelope, color='green', linewidth=2)
+        style_neon_axes(ax2)
+        glow_line(ax2, time_axis, envelope, color="#00F5A0", base_lw=2.0)
         threshold = np.mean(envelope)
-        ax2.axhline(threshold, color='red', linestyle='--', label="Detection Threshold")
+        ax2.axhline(threshold, color="#FF4D6D", linestyle="--", linewidth=1.6, alpha=0.9, label="Detection Threshold")
         ax2.set_xlabel("Time (s)")
-        ax2.grid(alpha=0.2)
         ax2.legend()
         st.pyplot(fig2, use_container_width=True)
-
-    # 3D / interactive “effect”
-    with st.expander("✨ 3D / Interactive View (Stylish)", expanded=True):
-        stride = max(1, len(time_axis) // 2500)
-        x = time_axis[::stride]
-        y1 = raw_rf[::stride]
-        y2 = envelope[::stride]
-
-        fig = go.Figure()
-        fig.add_trace(go.Scatter3d(
-            x=x, y=y1, z=np.zeros_like(x),
-            mode="lines", name="Raw RF",
-            line=dict(width=4, color="rgba(200,200,200,0.85)")
-        ))
-        fig.add_trace(go.Scatter3d(
-            x=x, y=y2, z=np.ones_like(x) * 0.5,
-            mode="lines", name="Envelope",
-            line=dict(width=6, color="rgba(0,255,160,0.9)")
-        ))
-        fig.update_layout(
-            height=520,
-            margin=dict(l=0, r=0, t=30, b=0),
-            scene=dict(
-                xaxis_title="Time (s)",
-                yaxis_title="Amplitude",
-                zaxis_title="Layer",
-                bgcolor="rgba(0,0,0,0)",
-            ),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    st.divider()
 
     # 4. Extract bits and convert back to text
     received_bits = extract_bits(envelope, fs, t_bit, threshold)
     decoded_text = binary_to_text(received_bits)
+
+    # 5. 3D / interactive “effect” (toggle)
+    if enable_3d:
+        with st.expander("✨ 3D / Interactive View (Stylish)", expanded=True):
+            stride = max(1, len(time_axis) // 2500)
+            x = time_axis[::stride]
+            y1 = raw_rf[::stride]
+            y2 = envelope[::stride]
+
+            fig = go.Figure()
+            fig.add_trace(go.Scatter3d(
+                x=x, y=y1, z=np.zeros_like(x),
+                mode="lines", name="Raw RF",
+                line=dict(width=4, color="rgba(200,200,200,0.85)")
+            ))
+            fig.add_trace(go.Scatter3d(
+                x=x, y=y2, z=np.ones_like(x) * 0.5,
+                mode="lines", name="Envelope",
+                line=dict(width=6, color="rgba(0,255,160,0.9)")
+            ))
+            fig.update_layout(
+                height=520,
+                margin=dict(l=0, r=0, t=30, b=0),
+                scene=dict(
+                    xaxis_title="Time (s)",
+                    yaxis_title="Amplitude",
+                    zaxis_title="Layer",
+                    bgcolor="rgba(0,0,0,0)",
+                ),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
 
     # --- 7. FINAL DECODED OUTPUT ---
     st.subheader("3. Final Receiver Output")
@@ -185,3 +219,23 @@ else:
     else:
         st.error(f"❌ Bit Error! Too much noise. Decoded text looks corrupted: **{decoded_text}**")
         st.write(f"Received Binary: `{received_bits}`")
+
+    # Downloads (toggle)
+    if enable_downloads:
+        d1, d2 = st.columns(2)
+        with d1:
+            st.download_button(
+                "Download Received Binary",
+                data=received_bits.encode("utf-8"),
+                file_name="received_bits.txt",
+                mime="text/plain",
+                use_container_width=True,
+            )
+        with d2:
+            st.download_button(
+                "Download Decoded Text",
+                data=decoded_text.encode("utf-8"),
+                file_name="decoded_text.txt",
+                mime="text/plain",
+                use_container_width=True,
+            )
